@@ -34,7 +34,7 @@ export default function Home() {
   const [btc, setBtc] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [clock, setClock] = useState('')
-  const [weather, setWeather] = useState('YOUR LOCATON')
+  const [weather, setWeather] = useState<any>(null)
   
  useEffect(() => {
   function fetchMarketData() {
