@@ -30,36 +30,45 @@ export default function Home() {
   const [readIds, setReadIds] = useState<Set<number>>(new Set())
   const [secs, setSecs] = useState(0)
   const [rates, setRates] = useState<any>(null)
-  const [weather, setWeather] = useState<any>(null)
+  const [locationName, setLocationName] = useState('YOUR LOCATION')
   const [btc, setBtc] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [clock, setClock] = useState('')
-
-  useEffect(() => {
-    supabase.from('articles').select('*')
-      .order('published_at', { ascending: false }).limit(12)
-      .then(({ data }) => { if (data) setArticles(data); setLoading(false) })
-  }, [])
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      setSecs(s => s + 1)
-      const n = new Date()
-      setClock(`${p(n.getHours())}:${p(n.getMinutes())}`)
-    }, 1000)
-    const n = new Date()
-    setClock(`${p(n.getHours())}:${p(n.getMinutes())}`)
-    return () => clearInterval(t)
-  }, [])
-
-  useEffect(() => {
+  const [weather, setWeather] = useState('YOUR LOCATON')
+  
+ useEffect(() => {
+  function fetchMarketData() {
     fetch('https://api.frankfurter.dev/v1/latest?from=GBP&to=USD,EUR')
       .then(r => r.json()).then(d => setRates(d.rates)).catch(() => {})
-    fetch('https://api.open-meteo.com/v1/forecast?latitude=52.77&longitude=-1.21&current=temperature_2m,weather_code&timezone=Europe%2FLondon')
-      .then(r => r.json()).then(d => setWeather(d.current)).catch(() => {})
     fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot')
       .then(r => r.json()).then(d => setBtc(parseFloat(d.data.amount))).catch(() => {})
-  }, [])
+  }
+  fetchMarketData()
+  const interval = setInterval(fetchMarketData, 60000)
+  return () => clearInterval(interval)
+}, [])
+
+useEffect(() => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lon } = pos.coords
+        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`)
+          .then(r => r.json()).then(d => setWeather(d.current)).catch(() => {})
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`)
+          .then(r => r.json()).then(d => setLocationName(d.address?.city || d.address?.town || d.address?.village || 'YOUR LOCATION')).catch(() => {})
+      },
+      () => {
+        fetch('https://api.open-meteo.com/v1/forecast?latitude=51.51&longitude=-0.13&current=temperature_2m,weather_code&timezone=auto')
+          .then(r => r.json()).then(d => setWeather(d.current)).catch(() => {})
+        setLocationName('LONDON')
+      }
+    )
+  } else {
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=51.51&longitude=-0.13&current=temperature_2m,weather_code&timezone=auto')
+      .then(r => r.json()).then(d => setWeather(d.current)).catch(() => {})
+  }
+}, [])
 
   function p(n: number) { return String(n).padStart(2, '0') }
   function timer() { return `${p(Math.floor(secs/60))}:${p(secs%60)}` }
@@ -116,7 +125,7 @@ export default function Home() {
             ))}
             <div style={{ padding:'7px 12px', borderBottom:b, fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, background:C.surface, marginTop:2 }}>WEATHER</div>
             <div style={{ padding:'7px 12px', borderBottom:bl }}>
-              <div style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted }}>LOUGHBOROUGH</div>
+              <div style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted }}>{locationName.toUpperCase()}</div>
               <div style={{ fontFamily:'monospace', fontSize:14, fontWeight:700, color:C.text }}>{weather ? `${Math.round(weather.temperature_2m)}°C` : '—'}</div>
               <div style={{ fontFamily:'monospace', fontSize:10, color:C.textMuted }}>{weather ? (WX[weather.weather_code] || 'Variable') : '...'}</div>
             </div>
