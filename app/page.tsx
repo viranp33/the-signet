@@ -35,6 +35,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [clock, setClock] = useState('')
   const [weather, setWeather] = useState<any>(null)
+  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null)
   
  useEffect(() => {
   function fetchMarketData() {
@@ -88,7 +89,43 @@ useEffect(() => {
       .then(r => r.json()).then(d => setWeather(d.current)).catch(() => {})
   }
 }, [])
+function estimateReadTime(text: string) {
+  const words = text ? text.split(' ').length : 0
+  return `${Math.max(1, Math.round(words / 200))} min read`
+}
 
+function openArticle(article: Article) {
+  setSelectedArticle(article)
+}
+
+function closeReader() {
+  setSelectedArticle(null)
+}
+
+function readInFull() {
+  if (!selectedArticle) return
+  markRead(selectedArticle.id)
+  window.open(selectedArticle.url, '_blank')
+  const currentIndex = articles.findIndex(a => a.id === selectedArticle.id)
+  const next = articles[currentIndex + 1]
+  if (next) setSelectedArticle(next)
+  else setSelectedArticle(null)
+}
+
+function markReadAndReturn() {
+  if (!selectedArticle) return
+  markRead(selectedArticle.id)
+  setSelectedArticle(null)
+}
+
+function nextArticle() {
+  if (!selectedArticle) return
+  markRead(selectedArticle.id)
+  const currentIndex = articles.findIndex(a => a.id === selectedArticle.id)
+  const next = articles[currentIndex + 1]
+  if (next) setSelectedArticle(next)
+  else setSelectedArticle(null)
+}
   function p(n: number) { return String(n).padStart(2, '0') }
   function timer() { return `${p(Math.floor(secs/60))}:${p(secs%60)}` }
   function markRead(id: number) { setReadIds(prev => new Set([...prev, id])) }
@@ -174,38 +211,88 @@ useEffect(() => {
               <span style={{ fontFamily:'monospace', fontSize:10, color:C.textMuted }}>{today}</span>
             </div>
 
-            {!complete ? (
-              <div style={{ overflowY:'auto', maxHeight:440 }}>
-                {loading ? (
-                  <div style={{ padding:30, textAlign:'center', fontFamily:'monospace', fontSize:10, color:C.textMuted, letterSpacing:2 }}>LOADING BRIEFING…</div>
-                ) : articles.map(article => (
-                  <div key={article.id}
-                    onClick={() => markRead(article.id)}
-                    style={{ padding:'10px 14px', borderBottom:bl, cursor:'pointer', opacity:readIds.has(article.id)?0.38:1, display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10 }}
-                    onMouseEnter={e => (e.currentTarget.style.background=C.surface)}
-                    onMouseLeave={e => (e.currentTarget.style.background='transparent')}
-                  >
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, color:C.accent }}>{article.source.toUpperCase()}</div>
-                      <div style={{ fontSize:12, fontWeight:500, color:C.text, margin:'4px 0 3px', lineHeight:1.45 }}>{article.title}</div>
-                      <div style={{ display:'flex', gap:10, fontFamily:'monospace', fontSize:9, color:C.textMuted }}>
-                        <span>{new Date(article.published_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>
-                        <span>{article.topic}</span>
-                      </div>
-                    </div>
-                    <div style={{ width:14, height:14, border:`0.5px solid ${readIds.has(article.id)?C.positive:C.border}`, borderRadius:2, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, flexShrink:0, marginTop:2, background:readIds.has(article.id)?C.positive:'transparent', color:'white' }}>
-                      {readIds.has(article.id)?'✓':''}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'50px 20px', textAlign:'center', flex:1 }}>
-                <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:3, color:C.textMuted, marginBottom:10 }}>BRIEFING COMPLETE</div>
-                <div style={{ fontSize:18, fontWeight:500, color:C.text, marginBottom:8 }}>{"You're fully informed."}</div>
-                <div style={{ fontSize:12, color:C.textMuted, maxWidth:220, lineHeight:1.7 }}>{"That's everything for today. Close the terminal and get on with your day."}</div>
-              </div>
-            )}
+           {selectedArticle ? (
+  <div style={{ display:'flex', flexDirection:'column', flex:1 }}>
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 14px', borderBottom:bl, background:C.surface }}>
+      <button onClick={closeReader} style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 12px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>← BRIEFING</button>
+      <div style={{ display:'flex', gap:8 }}>
+<button onClick={readInFull} style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 14px', border:`0.5px solid ${C.accent}`, borderRadius:4, background:'transparent', color:C.accent, cursor:'pointer' }}>READ IN FULL ↗</button>
+      </div>
+    </div>
+
+    <div style={{ flex:1, overflowY:'auto', padding:'28px 32px' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+        <span style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.accent, padding:'3px 8px', border:`0.5px solid ${C.accent}`, borderRadius:2 }}>{selectedArticle.source.toUpperCase()}</span>
+        <span style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted }}>{new Date(selectedArticle.published_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>
+        <span style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted }}>◷ {estimateReadTime(selectedArticle.summary)}</span>
+      </div>
+
+      <div style={{ fontSize:20, fontWeight:600, color:C.text, lineHeight:1.35, marginBottom:20, letterSpacing:-0.3 }}>{selectedArticle.title}</div>
+
+      <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:10 }}>SUMMARY</div>
+      <div style={{ fontSize:13, color:C.textMid, lineHeight:1.8, marginBottom:28 }}>{selectedArticle.summary || 'No summary available — click Read in Full to view the article.'}</div>
+
+      <div style={{ height:`0.5px`, background:C.borderLight, marginBottom:20 }} />
+
+      <div style={{ padding:'14px 16px', border:b, borderRadius:5, background:C.surface, marginBottom:20 }}>
+        <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, color:C.textMuted, marginBottom:5 }}>ABOUT THIS SOURCE</div>
+        <div style={{ fontSize:12, color:C.textMid, lineHeight:1.6 }}>
+          {selectedArticle.source === 'BBC News' && 'BBC News is the UK\'s national broadcaster. Editorially independent and publicly funded. All reporting subject to BBC editorial guidelines.'}
+          {selectedArticle.source === 'The Guardian' && 'The Guardian is a British national newspaper founded in 1821. Independently owned by the Scott Trust. No shareholders, no proprietor.'}
+          {selectedArticle.source === 'Sky News' && 'Sky News is a British 24-hour news channel. Separate editorial independence from Sky\'s entertainment operations.'}
+          {!['BBC News','The Guardian','Sky News'].includes(selectedArticle.source) && `${selectedArticle.source} — added to your briefing sources.`}
+        </div>
+      </div>
+
+      <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+        <button onClick={markReadAndReturn} style={{ fontFamily:'monospace', fontSize:11, letterSpacing:1, padding:'10px 20px', border:`0.5px solid ${C.positive}`, borderRadius:4, background:'transparent', color:C.positive, cursor:'pointer' }}>MARK READ & RETURN</button>
+<button onClick={nextArticle} style={{ fontFamily:'monospace', fontSize:11, letterSpacing:1, padding:'10px 20px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>NEXT ARTICLE →</button>
+      </div>
+
+      {selectedArticle.topic && (
+        <div style={{ marginTop:20, display:'flex', gap:6 }}>
+          <span style={{ fontFamily:'monospace', fontSize:9, padding:'3px 8px', border:b, borderRadius:2, color:C.textMuted }}>{selectedArticle.topic}</span>
+        </div>
+      )}
+    </div>
+  </div>
+) : !complete ? (
+  <div style={{ overflowY:'auto', maxHeight:440 }}>
+    {loading ? (
+      <div style={{ padding:30, textAlign:'center', fontFamily:'monospace', fontSize:10, color:C.textMuted, letterSpacing:2 }}>LOADING BRIEFING…</div>
+    ) : articles.map(article => (
+      <div key={article.id}
+        onClick={() => openArticle(article)}
+        style={{ padding:'10px 14px', borderBottom:bl, cursor:'pointer', opacity:readIds.has(article.id)?0.38:1, display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10 }}
+        onMouseEnter={e => (e.currentTarget.style.background=C.surface)}
+        onMouseLeave={e => (e.currentTarget.style.background='transparent')}
+      >
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, color:C.accent }}>{article.source.toUpperCase()}</div>
+          <div style={{ fontSize:12, fontWeight:500, color:C.text, margin:'4px 0 3px', lineHeight:1.45 }}>{article.title}</div>
+          <div style={{ display:'flex', gap:10, fontFamily:'monospace', fontSize:9, color:C.textMuted }}>
+            <span>{new Date(article.published_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>
+            <span>{article.topic}</span>
+          </div>
+        </div>
+        <div style={{ width:14, height:14, border:`0.5px solid ${readIds.has(article.id)?C.positive:C.border}`, borderRadius:2, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, flexShrink:0, marginTop:2, background:readIds.has(article.id)?C.positive:'transparent', color:'white' }}>
+          {readIds.has(article.id)?'✓':''}
+        </div>
+      </div>
+    ))}
+  </div>
+) : (
+  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'50px 20px', textAlign:'center', flex:1 }}>
+    <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:3, color:C.textMuted, marginBottom:10 }}>BRIEFING COMPLETE</div>
+    <div style={{ fontSize:18, fontWeight:500, color:C.text, marginBottom:8 }}>{"You're fully informed."}</div>
+    <div style={{ fontSize:12, color:C.textMuted, maxWidth:220, lineHeight:1.7 }}>{"That's everything for today. Close the terminal and get on with your day."}</div>
+  </div>
+)}
+{secs >= 900 && (
+  <div style={{ padding:'6px 14px', borderTop:b, background:C.surface, fontFamily:'monospace', fontSize:9, letterSpacing:1, color:C.textMuted, textAlign:'center' }}>
+    15 MINUTES — CONSIDER CLOSING THE TERMINAL
+  </div>
+)}
           </div>
 
           {/* RIGHT */}
