@@ -49,6 +49,17 @@ export default function Home() {
 }, [])
 
 useEffect(() => {
+  supabase.from('articles').select('*')
+    .order('published_at', { ascending: false }).limit(12)
+    .then(({ data, error }) => {
+      if (data) setArticles(data)
+      if (error) console.error('Supabase error:', error.message)
+      setLoading(false)
+    })
+    .catch(() => setLoading(false))
+}, [])
+
+useEffect(() => {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
