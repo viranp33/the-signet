@@ -49,14 +49,22 @@ export default function Home() {
 }, [])
 
 useEffect(() => {
-  supabase.from('articles').select('*')
-    .order('published_at', { ascending: false }).limit(12)
-    .then(({ data, error }) => {
+  async function loadArticles() {
+    try {
+      const { data, error } = await supabase
+        .from('articles')
+        .select('*')
+        .order('published_at', { ascending: false })
+        .limit(12)
       if (data) setArticles(data)
       if (error) console.error('Supabase error:', error.message)
+    } catch (e) {
+      console.error('Failed to load articles:', e)
+    } finally {
       setLoading(false)
-    })
-    .catch(() => setLoading(false))
+    }
+  }
+  loadArticles()
 }, [])
 
 useEffect(() => {
