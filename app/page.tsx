@@ -140,7 +140,7 @@ function nextArticle() {
 
   return (
     <div style={{ fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', background:C.bg, minHeight:'100vh', padding:16 }}>
-      <div style={{ maxWidth:100%, margin:'0 auto', border:b, borderRadius:8, overflow:'hidden', boxShadow:'0 2px 20px rgba(0,0,0,0.07)', background:'#FAFAF8' }}>
+      <div style={{ maxWidth: '100%', margin:'0 auto', border:b, borderRadius:8, overflow:'hidden', boxShadow:'0 2px 20px rgba(0,0,0,0.07)', background:'#FAFAF8' }}>
 
         {/* HEADER */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 18px', borderBottom:b, background:C.surface }}>
