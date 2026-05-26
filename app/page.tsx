@@ -26,6 +26,7 @@ const WX: Record<number, string> = {
 }
 
 export default function Home() {
+  const [user, setUser] = useState<any>(null)
   const [articles, setArticles] = useState<Article[]>([])
   const [readIds, setReadIds] = useState<Set<number>>(new Set())
   const [secs, setSecs] = useState(0)
@@ -66,6 +67,18 @@ useEffect(() => {
     }
   }
   loadArticles()
+}, [])
+
+useEffect(() => {
+  supabase.auth.getUser().then(({ data }) => setUser(data.user))
+  const t = setInterval(() => {
+    setSecs(s => s + 1)
+    const n = new Date()
+    setClock(`${p(n.getHours())}:${p(n.getMinutes())}`)
+  }, 1000)
+  const n = new Date()
+  setClock(`${p(n.getHours())}:${p(n.getMinutes())}`)
+  return () => clearInterval(t)
 }, [])
 
 useEffect(() => {
