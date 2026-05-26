@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 
 const C = {
   bg: '#F5F0E6', surface: '#EDE5D4', border: '#D4C9B0',
@@ -12,17 +12,23 @@ export default function SignIn() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   async function sendMagicLink() {
     if (!email) return
     setLoading(true)
-    const supabase = createClient()
-    await supabase.auth.signInWithOtp({
+    setError('')
+    const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` }
     })
-    setSent(true)
-    setLoading(false)
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+    } else {
+      setSent(true)
+      setLoading(false)
+    }
   }
 
   return (
@@ -50,6 +56,11 @@ export default function SignIn() {
               placeholder="your@email.com"
               style={{ width:'100%', fontFamily:'monospace', fontSize:13, padding:'9px 12px', border:`0.5px solid ${C.border}`, borderRadius:4, background:'#FAFAF8', color:C.text, marginBottom:12, outline:'none' }}
             />
+            {error && (
+              <div style={{ fontFamily:'monospace', fontSize:10, color:'#A32D2D', marginBottom:10, padding:'7px 10px', border:'0.5px solid #A32D2D', borderRadius:4 }}>
+                {error}
+              </div>
+            )}
             <button
               onClick={sendMagicLink}
               disabled={loading}
