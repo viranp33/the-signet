@@ -37,7 +37,21 @@ export default function Home() {
   const [clock, setClock] = useState('')
   const [weather, setWeather] = useState<any>(null)
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null)
+  const [showSourceLibrary, setShowSourceLibrary] = useState(false)
+  const [userSources, setUserSources] = useState<any[]>([])
+  const [library, setLibrary] = useState<any[]>([])
+  const [activeCategory, setActiveCategory] = useState('World News')
+  const [addingSource, setAddingSource] = useState<string | null>(null)
   
+  useEffect(() => {
+  async function loadSources() {
+    const { data: sources } = await supabase.from('sources').select('*').eq('active', true)
+    if (sources) setUserSources(sources)
+    const { data: lib } = await supabase.from('source_library').select('*').order('name')
+    if (lib) setLibrary(lib)
+  }
+  loadSources()
+}, [])
  useEffect(() => {
   function fetchMarketData() {
     fetch('https://api.frankfurter.dev/v1/latest?from=GBP&to=USD,EUR')
@@ -139,6 +153,23 @@ function nextArticle() {
   if (next) setSelectedArticle(next)
   else setSelectedArticle(null)
 }
+async function addSource(source: any) {
+  setAddingSource(source.url)
+  const alreadyAdded = userSources.some(s => s.url === source.url)
+  if (!alreadyAdded) {
+    const { error } = await supabase.from('sources').insert({
+      name: source.name, url: source.url, topic: source.topic,
+      active: true, max_per_day: 5
+    })
+    if (!error) setUserSources(prev => [...prev, source])
+  }
+  setAddingSource(null)
+}
+
+async function removeSource(url: string) {
+  await supabase.from('sources').delete().eq('url', url)
+  setUserSources(prev => prev.filter(s => s.url !== url))
+}
   function p(n: number) { return String(n).padStart(2, '0') }
   function timer() { return `${p(Math.floor(secs/60))}:${p(secs%60)}` }
   function markRead(id: number) { setReadIds(prev => new Set([...prev, id])) }
@@ -208,14 +239,21 @@ function nextArticle() {
               <div style={{ fontFamily:'monospace', fontSize:10, color:C.textMuted }}>{weather ? (WX[weather.weather_code] || 'Variable') : '...'}</div>
             </div>
             <div style={{ padding:'7px 12px', borderBottom:b, fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, background:C.surface, marginTop:2 }}>SOURCES</div>
-            {['BBC News','The Guardian','Sky News'].map(s => (
-              <div key={s} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 12px', fontSize:11, color:C.textMid }}>
-                <span style={{ width:5, height:5, borderRadius:'50%', background:C.positive, display:'inline-block', flexShrink:0 }} />{s}
-              </div>
-            ))}
-            <div style={{ padding:'6px 12px' }}>
-              <button style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, color:C.textMuted, background:'transparent', border:b, padding:'3px 8px', borderRadius:3, cursor:'pointer', width:'100%' }}>+ ADD SOURCE</button>
-            </div>
+            {userSources.map(s => (
+  <div key={s.url} style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 12px', fontSize:11, color:C.textMid, justifyContent:'space-between' }}>
+    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+      <span style={{ width:5, height:5, borderRadius:'50%', background:C.positive, display:'inline-block', flexShrink:0 }} />
+      {s.name}
+    </div>
+    <span onClick={() => removeSource(s.url)} style={{ fontFamily:'monospace', fontSize:8, color:C.textMuted, cursor:'pointer', letterSpacing:1 }}>✕</span>
+  </div>
+))}
+<div style={{ padding:'6px 12px' }}>
+  <button
+    onClick={() => { setShowSourceLibrary(true); setSelectedArticle(null) }}
+    style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, color:C.accent, background:'transparent', border:`0.5px solid ${C.accent}`, padding:'3px 8px', borderRadius:3, cursor:'pointer', width:'100%' }}
+  >+ ADD SOURCE</button>
+</div>
           </div>
 
           {/* CENTRE */}
@@ -233,7 +271,45 @@ function nextArticle() {
               <span style={{ fontFamily:'monospace', fontSize:10, color:C.textMuted }}>{today}</span>
             </div>
 
-           {selectedArticle ? (
+           {showSourceLibrary ? (
+  <div style={{ display:'flex', flexDirection:'column', flex:1 }}>
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 14px', borderBottom:bl, background:C.surface }}>
+      <button onClick={() => setShowSourceLibrary(false)} style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 12px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>← BRIEFING</button>
+      <span style={{ fontFamily:'monospace', fontSize:10, letterSpacing:2, color:C.textMuted }}>SOURCE LIBRARY</span>
+    </div>
+    <div style={{ display:'flex', gap:6, padding:'10px 14px', borderBottom:bl, flexWrap:'wrap' }}>
+      {[...new Set(library.map(s => s.category))].map(cat => (
+        <button key={cat} onClick={() => setActiveCategory(cat)}
+          style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, padding:'4px 10px', borderRadius:3, border:`0.5px solid ${activeCategory===cat ? C.accent : C.border}`, background:activeCategory===cat ? '#FAEEDA' : 'transparent', color:activeCategory===cat ? C.accent : C.textMuted, cursor:'pointer' }}>
+          {cat}
+        </button>
+      ))}
+    </div>
+    <div style={{ overflowY:'auto', flex:1, padding:'10px 14px' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+        {library.filter(s => s.category === activeCategory).map(source => {
+          const isAdded = userSources.some(u => u.url === source.url)
+          return (
+            <div key={source.url} style={{ border:`0.5px solid ${C.border}`, borderRadius:5, padding:'10px 12px', opacity:isAdded?0.6:1 }}>
+              <div style={{ fontSize:12, fontWeight:500, color:C.text, marginBottom:4 }}>{source.name}</div>
+              <div style={{ fontSize:11, color:C.textMuted, lineHeight:1.5, marginBottom:8 }}>{source.description}</div>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <span style={{ fontFamily:'monospace', fontSize:9, padding:'2px 6px', background:C.surface, borderRadius:2, color:C.textMuted }}>{source.topic}</span>
+                <button
+                  onClick={() => isAdded ? removeSource(source.url) : addSource(source)}
+                  disabled={addingSource === source.url}
+                  style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, padding:'3px 10px', border:`0.5px solid ${isAdded ? C.border : C.accent}`, borderRadius:3, background:'transparent', color:isAdded ? C.textMuted : C.accent, cursor:'pointer' }}
+                >
+                  {addingSource===source.url ? '…' : isAdded ? 'REMOVE' : '+ ADD'}
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  </div>
+) : selectedArticle ? (
   <div style={{ display:'flex', flexDirection:'column', flex:1 }}>
     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 14px', borderBottom:bl, background:C.surface }}>
       <button onClick={closeReader} style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 12px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>← BRIEFING</button>
