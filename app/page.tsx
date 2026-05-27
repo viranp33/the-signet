@@ -169,9 +169,18 @@ function nextArticle() {
               <div style={{ fontFamily:'monospace', fontSize:15, fontWeight:700, color:C.accent }}>{timer()}</div>
             </div>
             <div style={{ fontFamily:'monospace', fontSize:13, color:C.text }}>{clock}</div>
-            <button style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 14px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>
-              END BRIEFING
-            </button>
+            {user && (
+  <span style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted, marginRight:8 }}>{user.email}</span>
+)}
+<button
+  onClick={() => supabase.auth.signOut().then(() => window.location.href = '/signin')}
+  style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 12px', border:`0.5px solid ${C.border}`, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer', marginRight:8 }}
+>
+  SIGN OUT
+</button>
+<button style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 14px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>
+  END BRIEFING
+</button>
           </div>
         </div>
 
