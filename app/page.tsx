@@ -42,6 +42,7 @@ export default function Home() {
   const [library, setLibrary] = useState<any[]>([])
   const [activeCategory, setActiveCategory] = useState('World News')
   const [addingSource, setAddingSource] = useState<string | null>(null)
+  const [topicQuery, setTopicQuery] = useState('')
   
   useEffect(() => {
   async function loadSources() {
@@ -63,6 +64,23 @@ export default function Home() {
   const interval = setInterval(fetchMarketData, 60000)
   return () => clearInterval(interval)
 }, [])
+
+async function addTopicSearch() {
+  if (!topicQuery.trim()) return
+  const query = topicQuery.trim()
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-GB&gl=GB&ceid=GB:en`
+  const { error } = await supabase.from('sources').insert({
+    name: query,
+    url: url,
+    topic: 'Topic Search',
+    active: true,
+    max_per_day: 5
+  })
+  if (!error) {
+    setUserSources(prev => [...prev, { name: query, url, topic: 'Topic Search', active: true }])
+    setTopicQuery('')
+  }
+}
 
 useEffect(() => {
   async function loadArticles() {
@@ -276,7 +294,28 @@ async function removeSource(url: string) {
     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 14px', borderBottom:bl, background:C.surface }}>
       <button onClick={() => setShowSourceLibrary(false)} style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 12px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>← BRIEFING</button>
       <span style={{ fontFamily:'monospace', fontSize:10, letterSpacing:2, color:C.textMuted }}>SOURCE LIBRARY</span>
+    
     </div>
+    <div style={{ padding:'12px 14px', borderBottom:bl, background:C.bg }}>
+  <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:8 }}>SEARCH BY TOPIC</div>
+  <div style={{ fontSize:11, color:C.textMuted, marginBottom:10, lineHeight:1.6 }}>Type any topic and The Signet will find news from across the web — crypto, markets, companies, people, anything.</div>
+  <div style={{ display:'flex', gap:8 }}>
+    <input
+      value={topicQuery}
+      onChange={e => setTopicQuery(e.target.value)}
+      onKeyDown={e => e.key === 'Enter' && addTopicSearch()}
+      placeholder="e.g. XRP, BTC, TSLA, crypto, UK housing, Nvidia..."
+      style={{ flex:1, fontFamily:'monospace', fontSize:12, padding:'8px 10px', border:`0.5px solid ${C.border}`, borderRadius:4, background:'#FAFAF8', color:C.text, outline:'none' }}
+    />
+    <button
+      onClick={addTopicSearch}
+      style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'8px 16px', border:`0.5px solid ${C.accent}`, borderRadius:4, background:'transparent', color:C.accent, cursor:'pointer', whiteSpace:'nowrap' }}
+    >
+      ADD TOPIC ↗
+    </button>
+  </div>
+
+</div>
     <div style={{ display:'flex', gap:6, padding:'10px 14px', borderBottom:bl, flexWrap:'wrap' }}>
       {[...new Set(library.map(s => s.category))].map(cat => (
         <button key={cat} onClick={() => setActiveCategory(cat)}
@@ -314,6 +353,7 @@ async function removeSource(url: string) {
     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 14px', borderBottom:bl, background:C.surface }}>
       <button onClick={closeReader} style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 12px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>← BRIEFING</button>
       <div style={{ display:'flex', gap:8 }}>
+        
 <button onClick={readInFull} style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 14px', border:`0.5px solid ${C.accent}`, borderRadius:4, background:'transparent', color:C.accent, cursor:'pointer' }}>READ IN FULL ↗</button>
       </div>
     </div>
