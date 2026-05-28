@@ -45,14 +45,38 @@ export default function Home() {
   const [topicQuery, setTopicQuery] = useState('')
   
   useEffect(() => {
-  async function loadSources() {
-    const { data: sources } = await supabase.from('sources').select('*').eq('active', true)
+  async function init() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    setUser(user)
+
+    const { data: sources } = await supabase
+      .from('sources').select('*')
+      .eq('active', true).eq('user_id', user.id)
     if (sources) setUserSources(sources)
-    const { data: lib } = await supabase.from('source_library').select('*').order('name')
+
+    const { data: lib } = await supabase
+      .from('source_library').select('*').order('name')
     if (lib) setLibrary(lib)
+
+    try {
+      const sourceNames = sources?.map(s => s.name) || []
+      const { data, error } = await supabase
+        .from('articles').select('*')
+        .in('source', sourceNames.length > 0 ? sourceNames : [''])
+        .order('published_at', { ascending: false })
+        .limit(12)
+      if (data) setArticles(data)
+      if (error) console.error('Articles error:', error.message)
+    } catch (e) {
+      console.error('Failed to load articles:', e)
+    } finally {
+      setLoading(false)
+    }
   }
-  loadSources()
+  init()
 }, [])
+
  useEffect(() => {
   function fetchMarketData() {
     fetch('https://api.frankfurter.dev/v1/latest?from=GBP&to=USD,EUR')
@@ -66,15 +90,12 @@ export default function Home() {
 }, [])
 
 async function addTopicSearch() {
-  if (!topicQuery.trim()) return
+  if (!topicQuery.trim() || !user) return
   const query = topicQuery.trim()
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-GB&gl=GB&ceid=GB:en`
   const { error } = await supabase.from('sources').insert({
-    name: query,
-    url: url,
-    topic: 'Topic Search',
-    active: true,
-    max_per_day: 5
+    name: query, url, topic: 'Topic Search',
+    active: true, max_per_day: 5, user_id: user.id
   })
   if (!error) {
     setUserSources(prev => [...prev, { name: query, url, topic: 'Topic Search', active: true }])
@@ -82,27 +103,13 @@ async function addTopicSearch() {
   }
 }
 
-useEffect(() => {
-  async function loadArticles() {
-    try {
-      const { data, error } = await supabase
-        .from('articles')
-        .select('*')
-        .order('published_at', { ascending: false })
-        .limit(12)
-      if (data) setArticles(data)
-      if (error) console.error('Supabase error:', error.message)
-    } catch (e) {
-      console.error('Failed to load articles:', e)
-    } finally {
-      setLoading(false)
-    }
-  }
-  loadArticles()
-}, [])
+async function removeSource(url: string) {
+  if (!user) return
+  await supabase.from('sources').delete().eq('url', url).eq('user_id', user.id)
+  setUserSources(prev => prev.filter(s => s.url !== url))
+}
 
 useEffect(() => {
-  supabase.auth.getUser().then(({ data }) => setUser(data.user))
   const t = setInterval(() => {
     setSecs(s => s + 1)
     const n = new Date()
@@ -174,20 +181,16 @@ function nextArticle() {
 async function addSource(source: any) {
   setAddingSource(source.url)
   const alreadyAdded = userSources.some(s => s.url === source.url)
-  if (!alreadyAdded) {
+  if (!alreadyAdded && user) {
     const { error } = await supabase.from('sources').insert({
       name: source.name, url: source.url, topic: source.topic,
-      active: true, max_per_day: 5
+      active: true, max_per_day: 5, user_id: user.id
     })
     if (!error) setUserSources(prev => [...prev, source])
   }
   setAddingSource(null)
 }
 
-async function removeSource(url: string) {
-  await supabase.from('sources').delete().eq('url', url)
-  setUserSources(prev => prev.filter(s => s.url !== url))
-}
   function p(n: number) { return String(n).padStart(2, '0') }
   function timer() { return `${p(Math.floor(secs/60))}:${p(secs%60)}` }
   function markRead(id: number) { setReadIds(prev => new Set([...prev, id])) }
