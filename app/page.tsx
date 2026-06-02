@@ -43,7 +43,8 @@ export default function Home() {
   const [activeCategory, setActiveCategory] = useState('World News')
   const [addingSource, setAddingSource] = useState<string | null>(null)
   const [topicQuery, setTopicQuery] = useState('')
-  
+  const [topicLimit, setTopicLimit] = useState(5)
+
   useEffect(() => {
   async function init() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -95,7 +96,7 @@ async function addTopicSearch() {
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-GB&gl=GB&ceid=GB:en`
   const { error } = await supabase.from('sources').insert({
     name: query, url, topic: 'Topic Search',
-    active: true, max_per_day: 5, user_id: user.id
+    active: true, max_per_day: topicLimit, user_id: user.id
   })
   if (!error) {
     setUserSources(prev => [...prev, { name: query, url, topic: 'Topic Search', active: true }])
@@ -204,8 +205,8 @@ async function addSource(source: any) {
   const bl = `0.5px solid ${C.borderLight}`
 
   return (
-    <div style={{ fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', background:C.bg, minHeight:'100vh', padding:16 }}>
-      <div style={{ maxWidth: '100%', margin:'0 auto', border:b, borderRadius:8, overflow:'hidden', boxShadow:'0 2px 20px rgba(0,0,0,0.07)', background:'#FAFAF8' }}>
+    <div style={{ fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif', background:C.bg, height:'100vh', overflow:'hidden', padding:16 }}>
+      <div style={{ maxWidth: '100%', margin:'0 auto', border:b, borderRadius:8, overflow:'hidden', boxShadow:'0 2px 20px rgba(0,0,0,0.07)', background:'#FAFAF8', height: 'calc(100vh - 32px)', display: 'flex', flexDirection: 'column', }}>
 
         {/* HEADER */}
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 18px', borderBottom:b, background:C.surface }}>
@@ -237,7 +238,7 @@ async function addSource(source: any) {
         </div>
 
         {/* BODY */}
-        <div style={{ display:'grid', gridTemplateColumns:'178px 1fr 208px' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'178px 1fr 208px', flex: 1 }}>
 
           {/* LEFT */}
           <div style={{ borderRight:b }}>
@@ -310,6 +311,16 @@ async function addSource(source: any) {
       placeholder="e.g. XRP, BTC, TSLA, crypto, UK housing, Nvidia..."
       style={{ flex:1, fontFamily:'monospace', fontSize:12, padding:'8px 10px', border:`0.5px solid ${C.border}`, borderRadius:4, background:'#FAFAF8', color:C.text, outline:'none' }}
     />
+    <select
+      value={topicLimit}
+      onChange={e => setTopicLimit(Number(e.target.value))}
+      style={{ fontFamily:'monospace', fontSize:10, padding:'8px', border:`0.5px solid ${C.border}`, borderRadius:4, background:'#FAFAF8', color:C.text, cursor:'pointer' }}
+    >
+      <option value={3}>3/day</option>
+      <option value={5}>5/day</option>
+      <option value={10}>10/day</option>
+      <option value={15}>15/day</option>
+    </select>
     <button
       onClick={addTopicSearch}
       style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'8px 16px', border:`0.5px solid ${C.accent}`, borderRadius:4, background:'transparent', color:C.accent, cursor:'pointer', whiteSpace:'nowrap' }}
@@ -398,7 +409,7 @@ async function addSource(source: any) {
     </div>
   </div>
 ) : !complete ? (
-  <div style={{ overflowY:'auto', maxHeight:440 }}>
+  <div style={{ overflowY:'auto', flex:1 }}>
     {loading ? (
       <div style={{ padding:30, textAlign:'center', fontFamily:'monospace', fontSize:10, color:C.textMuted, letterSpacing:2 }}>LOADING BRIEFING…</div>
     ) : articles.map(article => (
