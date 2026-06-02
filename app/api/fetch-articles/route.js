@@ -4,12 +4,12 @@ import Parser from 'rss-parser'
 
 const parser = new Parser()
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
 export async function GET() {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  )
+
   try {
     const { data: sources, error: sourcesError } = await supabaseAdmin
       .from('sources')
