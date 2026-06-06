@@ -44,6 +44,9 @@ export default function Home() {
   const [addingSource, setAddingSource] = useState<string | null>(null)
   const [topicQuery, setTopicQuery] = useState('')
   const [topicLimit, setTopicLimit] = useState(5)
+  const [tickers, setTickers] = useState<any[]>([])
+  const [tickerPrices, setTickerPrices] = useState<Record<string, any>>({})
+  const [showTickerManager, setShowTickerManager] = useState(false)
 
   useEffect(() => {
   async function init() {
@@ -60,15 +63,28 @@ export default function Home() {
       .from('source_library').select('*').order('name')
     if (lib) setLibrary(lib)
 
+    const { data: userTickers } = await supabase
+      .from('tickers').select('*')
+      .eq('active', true).eq('user_id', user.id)
+    if (userTickers) {
+      setTickers(userTickers)
+      fetchTickerPrices(userTickers)
+    }
+
     try {
       const sourceNames = sources?.map(s => s.name) || []
-      const { data, error } = await supabase
+      const { data: allArticles } = await supabase
         .from('articles').select('*')
         .in('source', sourceNames.length > 0 ? sourceNames : [''])
         .order('published_at', { ascending: false })
-        .limit(12)
-      if (data) setArticles(data)
-      if (error) console.error('Articles error:', error.message)
+        .limit(100)
+
+      if (allArticles && sources) {
+        const balanced = (sources as any[]).flatMap(src =>
+          allArticles.filter(a => a.source === src.name).slice(0, src.max_per_day || 5)
+        ).sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
+        setArticles(balanced)
+      }
     } catch (e) {
       console.error('Failed to load articles:', e)
     } finally {
@@ -78,17 +94,12 @@ export default function Home() {
   init()
 }, [])
 
- useEffect(() => {
-  function fetchMarketData() {
-    fetch('https://api.frankfurter.dev/v1/latest?from=GBP&to=USD,EUR')
-      .then(r => r.json()).then(d => setRates(d.rates)).catch(() => {})
-    fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot')
-      .then(r => r.json()).then(d => setBtc(parseFloat(d.data.amount))).catch(() => {})
-  }
-  fetchMarketData()
-  const interval = setInterval(fetchMarketData, 60000)
+useEffect(() => {
+  const interval = setInterval(() => {
+    if (tickers.length > 0) fetchTickerPrices(tickers)
+  }, 60000)
   return () => clearInterval(interval)
-}, [])
+}, [tickers])
 
 async function addTopicSearch() {
   if (!topicQuery.trim() || !user) return
@@ -179,6 +190,45 @@ function nextArticle() {
   if (next) setSelectedArticle(next)
   else setSelectedArticle(null)
 }
+
+async function fetchTickerPrices(userTickers: any[]) {
+  if (!userTickers?.length) return
+  const prices: Record<string, any> = {}
+
+  const cryptos = userTickers.filter(t => t.type === 'crypto')
+  if (cryptos.length > 0) {
+    try {
+      const ids = [...new Set(cryptos.map(t => t.symbol))].join(',')
+      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd,gbp&include_24hr_change=true`)
+      const data = await res.json()
+      cryptos.forEach(t => {
+        prices[t.id] = {
+          price: data[t.symbol]?.[t.vs_currency],
+          change: data[t.symbol]?.[`${t.vs_currency}_24h_change`]
+        }
+      })
+    } catch (e) {}
+  }
+
+  const fxList = userTickers.filter(t => t.type === 'fx')
+  if (fxList.length > 0) {
+    try {
+      const res = await fetch('https://api.frankfurter.dev/v1/latest?from=GBP&to=USD,EUR,JPY,AUD,CAD,CHF')
+      const data = await res.json()
+      fxList.forEach(t => {
+        const key = t.vs_currency.toUpperCase()
+        const rate = data.rates?.[key]
+        prices[t.id] = {
+          price: t.symbol === 'GBP' ? rate : (rate ? 1 / rate : null),
+          change: null
+        }
+      })
+    } catch (e) {}
+  }
+
+  setTickerPrices(prices)
+}
+
 async function addSource(source: any) {
   setAddingSource(source.url)
   const alreadyAdded = userSources.some(s => s.url === source.url)
@@ -238,22 +288,43 @@ async function addSource(source: any) {
         </div>
 
         {/* BODY */}
-        <div style={{ display:'grid', gridTemplateColumns:'178px 1fr 208px', flex: 1 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'178px 1fr 208px', flex: 1, overflow:'hidden' }}>
 
           {/* LEFT */}
           <div style={{ borderRight:b }}>
             <div style={{ padding:'7px 12px', borderBottom:b, fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, background:C.surface }}>MARKETS</div>
-            {[
-              { label:'GBP / USD', val: rates ? rates.USD.toFixed(4) : '—', sub:'live rate' },
-              { label:'EUR / GBP', val: rates ? (1/rates.EUR).toFixed(4) : '—', sub:'live rate' },
-              { label:'BTC / USD', val: btc ? `$${Math.round(btc).toLocaleString()}` : '—', sub:'live price' },
-            ].map(row => (
-              <div key={row.label} style={{ padding:'7px 12px', borderBottom:bl }}>
-                <div style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted }}>{row.label}</div>
-                <div style={{ fontFamily:'monospace', fontSize:14, fontWeight:700, color:C.text }}>{row.val}</div>
-                <div style={{ fontFamily:'monospace', fontSize:10, color:C.textMuted }}>{row.sub}</div>
-              </div>
-            ))}
+            {tickers.map(ticker => {
+  const data = tickerPrices[ticker.id]
+  const price = data?.price
+  const change = data?.change
+  const formatted = price == null ? '—'
+    : ticker.type === 'crypto' && price > 100
+      ? `$${Math.round(price).toLocaleString()}`
+      : ticker.type === 'crypto'
+        ? `$${price.toFixed(4)}`
+        : price.toFixed(4)
+  return (
+    <div key={ticker.id} style={{ padding:'7px 12px', borderBottom:bl }}>
+      <div style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted }}>{ticker.display_name}</div>
+      <div style={{ fontFamily:'monospace', fontSize:14, fontWeight:700, color:C.text }}>{formatted}</div>
+      <div style={{ display:'flex', justifyContent:'space-between' }}>
+        <div style={{ fontFamily:'monospace', fontSize:10, color:C.textMuted }}>live</div>
+        {change != null && (
+          <div style={{ fontFamily:'monospace', fontSize:10, color: change >= 0 ? C.positive : '#A32D2D' }}>
+            {change >= 0 ? '+' : ''}{change.toFixed(2)}%
+          </div>
+        )}
+      </div>
+    </div>
+  )
+})}
+<div style={{ padding:'4px 12px 6px' }}>
+  <button
+    onClick={() => setShowTickerManager(true)}
+    style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, color:C.textMuted, background:'transparent', border:`0.5px solid ${C.border}`, padding:'3px 8px', borderRadius:3, cursor:'pointer', width:'100%' }}
+  >MANAGE TICKERS</button>
+</div>
+
             <div style={{ padding:'7px 12px', borderBottom:b, fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, background:C.surface, marginTop:2 }}>WEATHER</div>
             <div style={{ padding:'7px 12px', borderBottom:bl }}>
               <div style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted }}>{locationName.toUpperCase()}</div>
@@ -279,7 +350,7 @@ async function addSource(source: any) {
           </div>
 
           {/* CENTRE */}
-          <div style={{ display:'flex', flexDirection:'column', borderRight:b }}>
+          <div style={{ display:'flex', flexDirection:'column', borderRight:b, minHeight:0 }}>
             <div style={{ display:'flex', borderBottom:b, background:C.surface }}>
               {["TODAY'S BRIEFING",'SEARCH','WATCHED PAGES','SETTINGS'].map((tab,i) => (
                 <div key={tab} style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, padding:'7px 11px', color:i===0?C.accent:C.textMuted, borderBottom:i===0?`2px solid ${C.accent}`:'2px solid transparent', cursor:'pointer', whiteSpace:'nowrap' }}>{tab}</div>
