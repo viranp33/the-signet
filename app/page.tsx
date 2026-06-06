@@ -25,6 +25,30 @@ const WX: Record<number, string> = {
   71:'Light snow',80:'Showers',95:'Thunderstorm',
 }
 
+const POPULAR_CRYPTO = [
+  { symbol:'bitcoin', display:'BTC', name:'Bitcoin' },
+  { symbol:'ethereum', display:'ETH', name:'Ethereum' },
+  { symbol:'ripple', display:'XRP', name:'XRP' },
+  { symbol:'solana', display:'SOL', name:'Solana' },
+  { symbol:'cardano', display:'ADA', name:'Cardano' },
+  { symbol:'dogecoin', display:'DOGE', name:'Dogecoin' },
+  { symbol:'chainlink', display:'LINK', name:'Chainlink' },
+  { symbol:'litecoin', display:'LTC', name:'Litecoin' },
+  { symbol:'stellar', display:'XLM', name:'Stellar' },
+  { symbol:'avalanche-2', display:'AVAX', name:'Avalanche' },
+  { symbol:'polkadot', display:'DOT', name:'Polkadot' },
+  { symbol:'the-open-network', display:'TON', name:'Toncoin' },
+]
+
+const FX_PAIRS = [
+  { symbol:'GBP', display:'GBP/USD', vs:'usd' },
+  { symbol:'GBP', display:'GBP/EUR', vs:'eur' },
+  { symbol:'GBP', display:'GBP/JPY', vs:'jpy' },
+  { symbol:'GBP', display:'GBP/AUD', vs:'aud' },
+  { symbol:'EUR', display:'EUR/USD', vs:'usd' },
+  { symbol:'USD', display:'USD/JPY', vs:'jpy' },
+]
+
 export default function Home() {
   const [user, setUser] = useState<any>(null)
   const [articles, setArticles] = useState<Article[]>([])
@@ -47,6 +71,8 @@ export default function Home() {
   const [tickers, setTickers] = useState<any[]>([])
   const [tickerPrices, setTickerPrices] = useState<Record<string, any>>({})
   const [showTickerManager, setShowTickerManager] = useState(false)
+  const [selectedTickerOption, setSelectedTickerOption] = useState('')
+  
 
   useEffect(() => {
   async function init() {
@@ -229,6 +255,21 @@ async function fetchTickerPrices(userTickers: any[]) {
   setTickerPrices(prices)
 }
 
+async function addTicker(symbol: string, displayName: string, type: string, vs: string) {
+  if (!user || tickers.length >= 6) return
+  if (tickers.some(t => t.display_name === displayName)) return
+  const { data, error } = await supabase.from('tickers').insert({
+    user_id: user.id, symbol, display_name: displayName,
+    type, vs_currency: vs, active: true
+  }).select().single()
+  if (!error && data) setTickers(prev => [...prev, data])
+}
+
+async function removeTicker(tickerId: string) {
+  await supabase.from('tickers').delete().eq('id', tickerId)
+  setTickers(prev => prev.filter(t => t.id !== tickerId))
+}
+
 async function addSource(source: any) {
   setAddingSource(source.url)
   const alreadyAdded = userSources.some(s => s.url === source.url)
@@ -364,7 +405,70 @@ async function addSource(source: any) {
               <span style={{ fontFamily:'monospace', fontSize:10, color:C.textMuted }}>{today}</span>
             </div>
 
-           {showSourceLibrary ? (
+           {showTickerManager ? (
+  <div style={{ display:'flex', flexDirection:'column', flex:1 }}>
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 14px', borderBottom:bl, background:C.surface }}>
+      <button onClick={() => setShowTickerManager(false)} style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 12px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>← BRIEFING</button>
+      <span style={{ fontFamily:'monospace', fontSize:10, letterSpacing:2, color:C.textMuted }}>MANAGE TICKERS</span>
+    </div>
+    <div style={{ padding:'8px 14px', borderBottom:bl, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+      <span style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted }}>{tickers.length} of 6 active</span>
+      <div style={{ display:'flex', gap:4 }}>
+        {[...Array(6)].map((_,i) => (
+          <div key={i} style={{ width:7, height:7, borderRadius:'50%', background: i < tickers.length ? C.accent : C.borderLight }} />
+        ))}
+      </div>
+    </div>
+    <div style={{ overflowY:'auto', flex:1, padding:'12px 14px' }}>
+      <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:8 }}>YOUR TICKERS</div>
+      <div style={{ marginBottom:16 }}>
+        {tickers.map(t => (
+          <div key={t.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 10px', border:b, borderRadius:4, marginBottom:6, background:C.surface }}>
+            <div>
+              <span style={{ fontFamily:'monospace', fontSize:12, fontWeight:700, color:C.text }}>{t.display_name}</span>
+              <span style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted, marginLeft:8 }}>{t.type}</span>
+            </div>
+            <button onClick={() => removeTicker(t.id)} style={{ fontFamily:'monospace', fontSize:9, padding:'2px 8px', border:b, borderRadius:3, background:'transparent', color:C.textMuted, cursor:'pointer' }}>REMOVE</button>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:8 }}>ADD TICKER</div>
+<div style={{ display:'flex', gap:8, marginBottom:12 }}>
+  <select
+    value={selectedTickerOption}
+    onChange={e => setSelectedTickerOption(e.target.value)}
+    style={{ flex:1, fontFamily:'monospace', fontSize:11, padding:'8px 10px', border:b, borderRadius:4, background:'#FAFAF8', color:C.text }}
+  >
+    <option value=''>Select a ticker...</option>
+    <option disabled>── CRYPTO ──</option>
+    {POPULAR_CRYPTO.filter(c => !tickers.some(t => t.symbol === c.symbol)).map(c => (
+      <option key={c.symbol} value={`${c.symbol}||crypto||usd||${c.display}`}>{c.display} — {c.name}</option>
+    ))}
+    <option disabled>── FX PAIRS ──</option>
+    {FX_PAIRS.filter(f => !tickers.some(t => t.display_name === f.display)).map(f => (
+      <option key={f.display} value={`${f.symbol}||fx||${f.vs}||${f.display}`}>{f.display}</option>
+    ))}
+  </select>
+  <button
+    onClick={() => {
+      if (!selectedTickerOption || tickers.length >= 6) return
+      const parts = selectedTickerOption.split('||')
+      addTicker(parts[0], parts[3], parts[1], parts[2])
+      setSelectedTickerOption('')
+    }}
+    style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'8px 14px', border:`0.5px solid ${C.accent}`, borderRadius:4, background:'transparent', color:C.accent, cursor:'pointer', whiteSpace:'nowrap' as const }}
+  >
+    + ADD
+  </button>
+</div>
+{tickers.length >= 6 && (
+  <div style={{ padding:'8px 10px', border:b, borderRadius:4, fontFamily:'monospace', fontSize:9, color:C.textMuted, textAlign:'center' as const }}>
+    6 ticker limit reached — remove one to add another
+  </div>
+)}
+    </div>
+  </div>
+) : showSourceLibrary ? (
   <div style={{ display:'flex', flexDirection:'column', flex:1 }}>
     <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 14px', borderBottom:bl, background:C.surface }}>
       <button onClick={() => setShowSourceLibrary(false)} style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 12px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>← BRIEFING</button>
