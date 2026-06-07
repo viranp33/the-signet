@@ -46,6 +46,7 @@ export default function Home() {
   const [tickerPrices, setTickerPrices] = useState<Record<string, any>>({})
   const [showTickerManager, setShowTickerManager] = useState(false)
   const [activeTab, setActiveTab] = useState("TODAY'S BRIEFING")
+const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
   async function init() {
@@ -365,9 +366,51 @@ async function fetchTickerPrices(userTickers: any[]) {
     </button>
   </div>
 ) : activeTab === 'SEARCH' ? (
-  <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 28px', textAlign:'center' }}>
-    <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:12 }}>SEARCH COMING SOON</div>
-    <div style={{ fontSize:12, color:C.textMuted, lineHeight:1.7 }}>Search your briefing articles by keyword.</div>
+  <div style={{ display:'flex', flexDirection:'column', flex:1, minHeight:0 }}>
+    <div style={{ padding:'12px 14px', borderBottom:bl }}>
+      <input
+        value={searchQuery}
+        onChange={e => setSearchQuery(e.target.value)}
+        placeholder="Search your briefing..."
+        autoFocus
+        style={{ width:'100%', fontFamily:'monospace', fontSize:13, padding:'9px 12px', border:`0.5px solid ${C.border}`, borderRadius:4, background:'#FAFAF8', color:C.text, outline:'none', boxSizing:'border-box' as const }}
+      />
+    </div>
+    <div style={{ overflowY:'auto', flex:1 }}>
+      {articles
+        .filter(a => searchQuery.length > 1 &&
+          (a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           a.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           a.source.toLowerCase().includes(searchQuery.toLowerCase())))
+        .map(article => (
+          <div key={article.id}
+            onClick={() => { openArticle(article); setActiveTab("TODAY'S BRIEFING") }}
+            style={{ padding:'10px 14px', borderBottom:bl, cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:10 }}
+            onMouseEnter={e => (e.currentTarget.style.background=C.surface)}
+            onMouseLeave={e => (e.currentTarget.style.background='transparent')}
+          >
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, color:C.accent }}>{article.source.toUpperCase()}</div>
+              <div style={{ fontSize:12, fontWeight:500, color:C.text, margin:'4px 0 3px', lineHeight:1.45 }}>{article.title}</div>
+              <div style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted }}>{article.topic}</div>
+            </div>
+          </div>
+        ))}
+      {searchQuery.length > 1 && articles.filter(a =>
+        a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        a.source.toLowerCase().includes(searchQuery.toLowerCase())
+      ).length === 0 && (
+        <div style={{ padding:30, textAlign:'center', fontFamily:'monospace', fontSize:10, color:C.textMuted, letterSpacing:2 }}>
+          NO RESULTS FOR "{searchQuery.toUpperCase()}"
+        </div>
+      )}
+      {searchQuery.length <= 1 && (
+        <div style={{ padding:30, textAlign:'center', fontFamily:'monospace', fontSize:10, color:C.textMuted, letterSpacing:2 }}>
+          TYPE TO SEARCH YOUR BRIEFING
+        </div>
+      )}
+    </div>
   </div>
 ) : activeTab === 'WATCHED PAGES' ? (
   <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 28px', textAlign:'center' }}>
