@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import TickerManager from '@/app/components/TickerManager'
 import SourceLibrary from '@/app/components/SourceLibrary'
 import ArticleReader from '@/app/components/ArticleReader'
+import WatchedPages from '@/app/components/WatchedPages'
 
 type Article = {
   id: number
@@ -413,10 +414,7 @@ async function fetchTickerPrices(userTickers: any[]) {
     </div>
   </div>
 ) : activeTab === 'WATCHED PAGES' ? (
-  <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 28px', textAlign:'center' }}>
-    <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:12 }}>WATCHED PAGES COMING SOON</div>
-    <div style={{ fontSize:12, color:C.textMuted, lineHeight:1.7 }}>Monitor any webpage for changes matching your keywords.</div>
-  </div>
+  <WatchedPages user={user} />
 ) : showTickerManager ? (
 
   <TickerManager tickers={tickers} user={user} onClose={() => setShowTickerManager(false)} onTickersChange={setTickers} />
