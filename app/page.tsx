@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import TickerManager from '@/app/components/TickerManager'
+import SourceLibrary from '@/app/components/SourceLibrary'
+import ArticleReader from '@/app/components/ArticleReader'
 
 type Article = {
   id: number
@@ -25,30 +28,6 @@ const WX: Record<number, string> = {
   71:'Light snow',80:'Showers',95:'Thunderstorm',
 }
 
-const POPULAR_CRYPTO = [
-  { symbol:'bitcoin', display:'BTC', name:'Bitcoin' },
-  { symbol:'ethereum', display:'ETH', name:'Ethereum' },
-  { symbol:'ripple', display:'XRP', name:'XRP' },
-  { symbol:'solana', display:'SOL', name:'Solana' },
-  { symbol:'cardano', display:'ADA', name:'Cardano' },
-  { symbol:'dogecoin', display:'DOGE', name:'Dogecoin' },
-  { symbol:'chainlink', display:'LINK', name:'Chainlink' },
-  { symbol:'litecoin', display:'LTC', name:'Litecoin' },
-  { symbol:'stellar', display:'XLM', name:'Stellar' },
-  { symbol:'avalanche-2', display:'AVAX', name:'Avalanche' },
-  { symbol:'polkadot', display:'DOT', name:'Polkadot' },
-  { symbol:'the-open-network', display:'TON', name:'Toncoin' },
-]
-
-const FX_PAIRS = [
-  { symbol:'GBP', display:'GBP/USD', vs:'usd' },
-  { symbol:'GBP', display:'GBP/EUR', vs:'eur' },
-  { symbol:'GBP', display:'GBP/JPY', vs:'jpy' },
-  { symbol:'GBP', display:'GBP/AUD', vs:'aud' },
-  { symbol:'EUR', display:'EUR/USD', vs:'usd' },
-  { symbol:'USD', display:'USD/JPY', vs:'jpy' },
-]
-
 export default function Home() {
   const [user, setUser] = useState<any>(null)
   const [articles, setArticles] = useState<Article[]>([])
@@ -63,16 +42,10 @@ export default function Home() {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null)
   const [showSourceLibrary, setShowSourceLibrary] = useState(false)
   const [userSources, setUserSources] = useState<any[]>([])
-  const [library, setLibrary] = useState<any[]>([])
-  const [activeCategory, setActiveCategory] = useState('World News')
-  const [addingSource, setAddingSource] = useState<string | null>(null)
-  const [topicQuery, setTopicQuery] = useState('')
-  const [topicLimit, setTopicLimit] = useState(5)
   const [tickers, setTickers] = useState<any[]>([])
   const [tickerPrices, setTickerPrices] = useState<Record<string, any>>({})
   const [showTickerManager, setShowTickerManager] = useState(false)
-  const [selectedTickerOption, setSelectedTickerOption] = useState('')
-  
+  const [activeTab, setActiveTab] = useState("TODAY'S BRIEFING")
 
   useEffect(() => {
   async function init() {
@@ -84,10 +57,6 @@ export default function Home() {
       .from('sources').select('*')
       .eq('active', true).eq('user_id', user.id)
     if (sources) setUserSources(sources)
-
-    const { data: lib } = await supabase
-      .from('source_library').select('*').order('name')
-    if (lib) setLibrary(lib)
 
     const { data: userTickers } = await supabase
       .from('tickers').select('*')
@@ -127,20 +96,6 @@ useEffect(() => {
   return () => clearInterval(interval)
 }, [tickers])
 
-async function addTopicSearch() {
-  if (!topicQuery.trim() || !user) return
-  const query = topicQuery.trim()
-  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-GB&gl=GB&ceid=GB:en`
-  const { error } = await supabase.from('sources').insert({
-    name: query, url, topic: 'Topic Search',
-    active: true, max_per_day: topicLimit, user_id: user.id
-  })
-  if (!error) {
-    setUserSources(prev => [...prev, { name: query, url, topic: 'Topic Search', active: true }])
-    setTopicQuery('')
-  }
-}
-
 async function removeSource(url: string) {
   if (!user) return
   await supabase.from('sources').delete().eq('url', url).eq('user_id', user.id)
@@ -179,11 +134,6 @@ useEffect(() => {
       .then(r => r.json()).then(d => setWeather(d.current)).catch(() => {})
   }
 }, [])
-function estimateReadTime(text: string) {
-  const words = text ? text.split(' ').length : 0
-  return `${Math.max(1, Math.round(words / 200))} min read`
-}
-
 function openArticle(article: Article) {
   setSelectedArticle(article)
 }
@@ -255,34 +205,6 @@ async function fetchTickerPrices(userTickers: any[]) {
   setTickerPrices(prices)
 }
 
-async function addTicker(symbol: string, displayName: string, type: string, vs: string) {
-  if (!user || tickers.length >= 6) return
-  if (tickers.some(t => t.display_name === displayName)) return
-  const { data, error } = await supabase.from('tickers').insert({
-    user_id: user.id, symbol, display_name: displayName,
-    type, vs_currency: vs, active: true
-  }).select().single()
-  if (!error && data) setTickers(prev => [...prev, data])
-}
-
-async function removeTicker(tickerId: string) {
-  await supabase.from('tickers').delete().eq('id', tickerId)
-  setTickers(prev => prev.filter(t => t.id !== tickerId))
-}
-
-async function addSource(source: any) {
-  setAddingSource(source.url)
-  const alreadyAdded = userSources.some(s => s.url === source.url)
-  if (!alreadyAdded && user) {
-    const { error } = await supabase.from('sources').insert({
-      name: source.name, url: source.url, topic: source.topic,
-      active: true, max_per_day: 5, user_id: user.id
-    })
-    if (!error) setUserSources(prev => [...prev, source])
-  }
-  setAddingSource(null)
-}
-
   function p(n: number) { return String(n).padStart(2, '0') }
   function timer() { return `${p(Math.floor(secs/60))}:${p(secs%60)}` }
   function markRead(id: number) { setReadIds(prev => new Set([...prev, id])) }
@@ -329,7 +251,7 @@ async function addSource(source: any) {
         </div>
 
         {/* BODY */}
-        <div style={{ display:'grid', gridTemplateColumns:'178px 1fr 208px', flex: 1, overflow:'hidden' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'178px 1fr', flex: 1, overflow:'hidden' }}>
 
           {/* LEFT */}
           <div style={{ borderRight:b }}>
@@ -393,10 +315,14 @@ async function addSource(source: any) {
           {/* CENTRE */}
           <div style={{ display:'flex', flexDirection:'column', borderRight:b, minHeight:0 }}>
             <div style={{ display:'flex', borderBottom:b, background:C.surface }}>
-              {["TODAY'S BRIEFING",'SEARCH','WATCHED PAGES','SETTINGS'].map((tab,i) => (
-                <div key={tab} style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, padding:'7px 11px', color:i===0?C.accent:C.textMuted, borderBottom:i===0?`2px solid ${C.accent}`:'2px solid transparent', cursor:'pointer', whiteSpace:'nowrap' }}>{tab}</div>
-              ))}
-            </div>
+  {["TODAY'S BRIEFING",'SEARCH','WATCHED PAGES','SETTINGS'].map(tab => (
+    <div key={tab}
+      onClick={() => setActiveTab(tab)}
+      style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, padding:'7px 11px', color:activeTab===tab?C.accent:C.textMuted, borderBottom:activeTab===tab?`2px solid ${C.accent}`:'2px solid transparent', cursor:'pointer', whiteSpace:'nowrap' }}>
+      {tab}
+    </div>
+  ))}
+</div>
             <div style={{ height:2, background:C.borderLight }}>
               <div style={{ height:'100%', width:`${progress}%`, background:C.accent, transition:'width 0.4s' }} />
             </div>
@@ -404,185 +330,58 @@ async function addSource(source: any) {
               <span style={{ fontFamily:'monospace', fontSize:10, color:C.textMuted }}>{loading ? 'Loading briefing…' : `${readCount} of ${total} articles read`}</span>
               <span style={{ fontFamily:'monospace', fontSize:10, color:C.textMuted }}>{today}</span>
             </div>
+{activeTab === 'SETTINGS' ? (
+  <div style={{ flex:1, overflowY:'auto', padding:'24px 28px' }}>
+    <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:16 }}>ACCOUNT</div>
+    <div style={{ padding:'14px 16px', border:b, borderRadius:5, background:C.surface, marginBottom:20 }}>
+      <div style={{ fontSize:12, color:C.textMuted, marginBottom:4 }}>Signed in as</div>
+      <div style={{ fontSize:13, fontWeight:500, color:C.text }}>{user?.email}</div>
+    </div>
 
-           {showTickerManager ? (
-  <div style={{ display:'flex', flexDirection:'column', flex:1 }}>
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 14px', borderBottom:bl, background:C.surface }}>
-      <button onClick={() => setShowTickerManager(false)} style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 12px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>← BRIEFING</button>
-      <span style={{ fontFamily:'monospace', fontSize:10, letterSpacing:2, color:C.textMuted }}>MANAGE TICKERS</span>
-    </div>
-    <div style={{ padding:'8px 14px', borderBottom:bl, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-      <span style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted }}>{tickers.length} of 6 active</span>
-      <div style={{ display:'flex', gap:4 }}>
-        {[...Array(6)].map((_,i) => (
-          <div key={i} style={{ width:7, height:7, borderRadius:'50%', background: i < tickers.length ? C.accent : C.borderLight }} />
+    <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:16 }}>SESSION</div>
+    <div style={{ padding:'14px 16px', border:b, borderRadius:5, background:C.surface, marginBottom:20 }}>
+      <div style={{ fontSize:12, color:C.textMuted, marginBottom:8 }}>Mindful nudge — remind me after</div>
+      <div style={{ display:'flex', gap:8 }}>
+        {[10,15,20,30,45].map(mins => (
+          <button key={mins}
+            onClick={() => setSecs(0)}
+            style={{ fontFamily:'monospace', fontSize:10, padding:'5px 12px', border:`0.5px solid ${C.border}`, borderRadius:4, background: mins === 15 ? C.accent : 'transparent', color: mins === 15 ? 'white' : C.textMuted, cursor:'pointer' }}>
+            {mins}m
+          </button>
         ))}
       </div>
     </div>
-    <div style={{ overflowY:'auto', flex:1, padding:'12px 14px' }}>
-      <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:8 }}>YOUR TICKERS</div>
-      <div style={{ marginBottom:16 }}>
-        {tickers.map(t => (
-          <div key={t.id} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 10px', border:b, borderRadius:4, marginBottom:6, background:C.surface }}>
-            <div>
-              <span style={{ fontFamily:'monospace', fontSize:12, fontWeight:700, color:C.text }}>{t.display_name}</span>
-              <span style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted, marginLeft:8 }}>{t.type}</span>
-            </div>
-            <button onClick={() => removeTicker(t.id)} style={{ fontFamily:'monospace', fontSize:9, padding:'2px 8px', border:b, borderRadius:3, background:'transparent', color:C.textMuted, cursor:'pointer' }}>REMOVE</button>
-          </div>
-        ))}
-      </div>
-      <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:8 }}>ADD TICKER</div>
-<div style={{ display:'flex', gap:8, marginBottom:12 }}>
-  <select
-    value={selectedTickerOption}
-    onChange={e => setSelectedTickerOption(e.target.value)}
-    style={{ flex:1, fontFamily:'monospace', fontSize:11, padding:'8px 10px', border:b, borderRadius:4, background:'#FAFAF8', color:C.text }}
-  >
-    <option value=''>Select a ticker...</option>
-    <option disabled>── CRYPTO ──</option>
-    {POPULAR_CRYPTO.filter(c => !tickers.some(t => t.symbol === c.symbol)).map(c => (
-      <option key={c.symbol} value={`${c.symbol}||crypto||usd||${c.display}`}>{c.display} — {c.name}</option>
-    ))}
-    <option disabled>── FX PAIRS ──</option>
-    {FX_PAIRS.filter(f => !tickers.some(t => t.display_name === f.display)).map(f => (
-      <option key={f.display} value={`${f.symbol}||fx||${f.vs}||${f.display}`}>{f.display}</option>
-    ))}
-  </select>
-  <button
-    onClick={() => {
-      if (!selectedTickerOption || tickers.length >= 6) return
-      const parts = selectedTickerOption.split('||')
-      addTicker(parts[0], parts[3], parts[1], parts[2])
-      setSelectedTickerOption('')
-    }}
-    style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'8px 14px', border:`0.5px solid ${C.accent}`, borderRadius:4, background:'transparent', color:C.accent, cursor:'pointer', whiteSpace:'nowrap' as const }}
-  >
-    + ADD
-  </button>
-</div>
-{tickers.length >= 6 && (
-  <div style={{ padding:'8px 10px', border:b, borderRadius:4, fontFamily:'monospace', fontSize:9, color:C.textMuted, textAlign:'center' as const }}>
-    6 ticker limit reached — remove one to add another
-  </div>
-)}
+
+    <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:16 }}>BRIEFING</div>
+    <div style={{ padding:'14px 16px', border:b, borderRadius:5, background:C.surface, marginBottom:20 }}>
+      <div style={{ fontSize:12, color:C.textMuted, marginBottom:4 }}>Daily article limit per source</div>
+      <div style={{ fontSize:11, color:C.textMuted, lineHeight:1.6 }}>Adjust per source using the × controls in your sources panel. Default is 5 per source.</div>
     </div>
-  </div>
-) : showSourceLibrary ? (
-  <div style={{ display:'flex', flexDirection:'column', flex:1 }}>
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 14px', borderBottom:bl, background:C.surface }}>
-      <button onClick={() => setShowSourceLibrary(false)} style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 12px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>← BRIEFING</button>
-      <span style={{ fontFamily:'monospace', fontSize:10, letterSpacing:2, color:C.textMuted }}>SOURCE LIBRARY</span>
-    
-    </div>
-    <div style={{ padding:'12px 14px', borderBottom:bl, background:C.bg }}>
-  <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:8 }}>SEARCH BY TOPIC</div>
-  <div style={{ fontSize:11, color:C.textMuted, marginBottom:10, lineHeight:1.6 }}>Type any topic and The Signet will find news from across the web — crypto, markets, companies, people, anything.</div>
-  <div style={{ display:'flex', gap:8 }}>
-    <input
-      value={topicQuery}
-      onChange={e => setTopicQuery(e.target.value)}
-      onKeyDown={e => e.key === 'Enter' && addTopicSearch()}
-      placeholder="e.g. XRP, BTC, TSLA, crypto, UK housing, Nvidia..."
-      style={{ flex:1, fontFamily:'monospace', fontSize:12, padding:'8px 10px', border:`0.5px solid ${C.border}`, borderRadius:4, background:'#FAFAF8', color:C.text, outline:'none' }}
-    />
-    <select
-      value={topicLimit}
-      onChange={e => setTopicLimit(Number(e.target.value))}
-      style={{ fontFamily:'monospace', fontSize:10, padding:'8px', border:`0.5px solid ${C.border}`, borderRadius:4, background:'#FAFAF8', color:C.text, cursor:'pointer' }}
-    >
-      <option value={3}>3/day</option>
-      <option value={5}>5/day</option>
-      <option value={10}>10/day</option>
-      <option value={15}>15/day</option>
-    </select>
+
     <button
-      onClick={addTopicSearch}
-      style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'8px 16px', border:`0.5px solid ${C.accent}`, borderRadius:4, background:'transparent', color:C.accent, cursor:'pointer', whiteSpace:'nowrap' }}
-    >
-      ADD TOPIC ↗
+      onClick={() => supabase.auth.signOut().then(() => window.location.href = '/signin')}
+      style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'9px 18px', border:`0.5px solid #A32D2D`, borderRadius:4, background:'transparent', color:'#A32D2D', cursor:'pointer' }}>
+      SIGN OUT
     </button>
   </div>
-
-</div>
-    <div style={{ display:'flex', gap:6, padding:'10px 14px', borderBottom:bl, flexWrap:'wrap' }}>
-      {[...new Set(library.map(s => s.category))].map(cat => (
-        <button key={cat} onClick={() => setActiveCategory(cat)}
-          style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, padding:'4px 10px', borderRadius:3, border:`0.5px solid ${activeCategory===cat ? C.accent : C.border}`, background:activeCategory===cat ? '#FAEEDA' : 'transparent', color:activeCategory===cat ? C.accent : C.textMuted, cursor:'pointer' }}>
-          {cat}
-        </button>
-      ))}
-    </div>
-    <div style={{ overflowY:'auto', flex:1, padding:'10px 14px' }}>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-        {library.filter(s => s.category === activeCategory).map(source => {
-          const isAdded = userSources.some(u => u.url === source.url)
-          return (
-            <div key={source.url} style={{ border:`0.5px solid ${C.border}`, borderRadius:5, padding:'10px 12px', opacity:isAdded?0.6:1 }}>
-              <div style={{ fontSize:12, fontWeight:500, color:C.text, marginBottom:4 }}>{source.name}</div>
-              <div style={{ fontSize:11, color:C.textMuted, lineHeight:1.5, marginBottom:8 }}>{source.description}</div>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                <span style={{ fontFamily:'monospace', fontSize:9, padding:'2px 6px', background:C.surface, borderRadius:2, color:C.textMuted }}>{source.topic}</span>
-                <button
-                  onClick={() => isAdded ? removeSource(source.url) : addSource(source)}
-                  disabled={addingSource === source.url}
-                  style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, padding:'3px 10px', border:`0.5px solid ${isAdded ? C.border : C.accent}`, borderRadius:3, background:'transparent', color:isAdded ? C.textMuted : C.accent, cursor:'pointer' }}
-                >
-                  {addingSource===source.url ? '…' : isAdded ? 'REMOVE' : '+ ADD'}
-                </button>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
+) : activeTab === 'SEARCH' ? (
+  <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 28px', textAlign:'center' }}>
+    <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:12 }}>SEARCH COMING SOON</div>
+    <div style={{ fontSize:12, color:C.textMuted, lineHeight:1.7 }}>Search your briefing articles by keyword.</div>
   </div>
-) : selectedArticle ? (
-  <div style={{ display:'flex', flexDirection:'column', flex:1 }}>
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 14px', borderBottom:bl, background:C.surface }}>
-      <button onClick={closeReader} style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 12px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>← BRIEFING</button>
-      <div style={{ display:'flex', gap:8 }}>
-        
-<button onClick={readInFull} style={{ fontFamily:'monospace', fontSize:10, letterSpacing:1, padding:'5px 14px', border:`0.5px solid ${C.accent}`, borderRadius:4, background:'transparent', color:C.accent, cursor:'pointer' }}>READ IN FULL ↗</button>
-      </div>
-    </div>
-
-    <div style={{ flex:1, overflowY:'auto', padding:'28px 32px' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
-        <span style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.accent, padding:'3px 8px', border:`0.5px solid ${C.accent}`, borderRadius:2 }}>{selectedArticle.source.toUpperCase()}</span>
-        <span style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted }}>{new Date(selectedArticle.published_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>
-        <span style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted }}>◷ {estimateReadTime(selectedArticle.summary)}</span>
-      </div>
-
-      <div style={{ fontSize:20, fontWeight:600, color:C.text, lineHeight:1.35, marginBottom:20, letterSpacing:-0.3 }}>{selectedArticle.title}</div>
-
-      <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:10 }}>SUMMARY</div>
-      <div style={{ fontSize:13, color:C.textMid, lineHeight:1.8, marginBottom:28 }}>{selectedArticle.summary || 'No summary available — click Read in Full to view the article.'}</div>
-
-      <div style={{ height:`0.5px`, background:C.borderLight, marginBottom:20 }} />
-
-      <div style={{ padding:'14px 16px', border:b, borderRadius:5, background:C.surface, marginBottom:20 }}>
-        <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:1, color:C.textMuted, marginBottom:5 }}>ABOUT THIS SOURCE</div>
-        <div style={{ fontSize:12, color:C.textMid, lineHeight:1.6 }}>
-          {selectedArticle.source === 'BBC News' && 'BBC News is the UK\'s national broadcaster. Editorially independent and publicly funded. All reporting subject to BBC editorial guidelines.'}
-          {selectedArticle.source === 'The Guardian' && 'The Guardian is a British national newspaper founded in 1821. Independently owned by the Scott Trust. No shareholders, no proprietor.'}
-          {selectedArticle.source === 'Sky News' && 'Sky News is a British 24-hour news channel. Separate editorial independence from Sky\'s entertainment operations.'}
-          {!['BBC News','The Guardian','Sky News'].includes(selectedArticle.source) && `${selectedArticle.source} — added to your briefing sources.`}
-        </div>
-      </div>
-
-      <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
-        <button onClick={markReadAndReturn} style={{ fontFamily:'monospace', fontSize:11, letterSpacing:1, padding:'10px 20px', border:`0.5px solid ${C.positive}`, borderRadius:4, background:'transparent', color:C.positive, cursor:'pointer' }}>MARK READ & RETURN</button>
-<button onClick={nextArticle} style={{ fontFamily:'monospace', fontSize:11, letterSpacing:1, padding:'10px 20px', border:b, borderRadius:4, background:'transparent', color:C.textMuted, cursor:'pointer' }}>NEXT ARTICLE →</button>
-      </div>
-
-      {selectedArticle.topic && (
-        <div style={{ marginTop:20, display:'flex', gap:6 }}>
-          <span style={{ fontFamily:'monospace', fontSize:9, padding:'3px 8px', border:b, borderRadius:2, color:C.textMuted }}>{selectedArticle.topic}</span>
-        </div>
-      )}
-    </div>
+) : activeTab === 'WATCHED PAGES' ? (
+  <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 28px', textAlign:'center' }}>
+    <div style={{ fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, marginBottom:12 }}>WATCHED PAGES COMING SOON</div>
+    <div style={{ fontSize:12, color:C.textMuted, lineHeight:1.7 }}>Monitor any webpage for changes matching your keywords.</div>
   </div>
+) : showTickerManager ? (
+
+  <TickerManager tickers={tickers} user={user} onClose={() => setShowTickerManager(false)} onTickersChange={setTickers} />
+
+) : showSourceLibrary ? (<SourceLibrary userSources={userSources} user={user} onClose={() => setShowSourceLibrary(false)} onSourcesChange={setUserSources} />
+
+) : selectedArticle ? (<ArticleReader article={selectedArticle!} onClose={closeReader} onReadInFull={readInFull} onMarkReadAndReturn={markReadAndReturn} onNextArticle={nextArticle} />
+
 ) : !complete ? (
   <div style={{ overflowY:'auto', flex:1 }}>
     {loading ? (
@@ -620,30 +419,6 @@ async function addSource(source: any) {
     15 MINUTES — CONSIDER CLOSING THE TERMINAL
   </div>
 )}
-          </div>
-
-          {/* RIGHT */}
-          <div style={{ display:'flex', flexDirection:'column' }}>
-            <div style={{ padding:'7px 12px', borderBottom:b, fontFamily:'monospace', fontSize:9, letterSpacing:2, color:C.textMuted, background:C.surface }}>FOLLOWED ACCOUNTS — X</div>
-            <div style={{ overflowY:'auto', flex:1 }}>
-              {[
-                { name:'Martin Wolf', handle:'@martinwolf_', time:'09:11', body:'The divergence between US and EU productivity growth since 2010 is now too large to ignore.' },
-                { name:'BBC Breaking', handle:'@BBCBreaking', time:'08:47', body:'Bank of England holds rates at 4.5%. Future decisions remain data-dependent.' },
-                { name:'Rory Stewart', handle:'@RoryStewartUK', time:'08:22', body:'Just back from Nairobi. The pace of infrastructure development makes British planning debates look comic.' },
-                { name:'Tim Harford', handle:'@TimHarford', time:'07:14', body:'Fascinating that vibes-based economic pessimism persists even when the data looks reasonable.' },
-                { name:'ONS UK', handle:'@ONS', time:'06:30', body:'New release: UK Labour Market Overview. Unemployment holds at 4.2%.' },
-              ].map(post => (
-                <div key={post.handle} style={{ padding:'9px 12px', borderBottom:bl }}>
-                  <div style={{ display:'flex', justifyContent:'space-between' }}>
-                    <span style={{ fontSize:11, fontWeight:500, color:C.text }}>{post.name}</span>
-                    <span style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted }}>{post.time}</span>
-                  </div>
-                  <div style={{ fontFamily:'monospace', fontSize:9, color:C.textMuted, marginBottom:4 }}>{post.handle}</div>
-                  <div style={{ fontSize:11, color:C.textMid, lineHeight:1.55 }}>{post.body}</div>
-                </div>
-              ))}
-            </div>
-            <button style={{ margin:'8px 12px', fontFamily:'monospace', fontSize:9, letterSpacing:1, padding:'4px 8px', border:b, borderRadius:3, background:'transparent', color:C.textMuted, cursor:'pointer' }}>CONNECT X ACCOUNT</button>
           </div>
         </div>
 
