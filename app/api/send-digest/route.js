@@ -44,7 +44,7 @@ export async function GET() {
       const date = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' })
 
       const { error } = await resend.emails.send({
-        from: 'The Signet <briefing@thesignet.app>',
+        from: 'The Signet <onboarding@resend.dev>',
         to: user.email,
         subject: `Your Signet Briefing — ${date}`,
         html
