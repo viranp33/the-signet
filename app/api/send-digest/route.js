@@ -50,7 +50,11 @@ export async function GET() {
         html
       })
 
-      results.push({ user: user.email, status: error ? 'error' : 'sent' })
+      if (error) {
+  results.push({ user: user.email, status: 'error', detail: error.message })
+} else {
+  results.push({ user: user.email, status: 'sent' })
+}
     } catch (e) {
       results.push({ user: user.email, status: 'error', error: e.message })
     }
