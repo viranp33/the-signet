@@ -99,6 +99,29 @@ useEffect(() => {
   return () => clearInterval(interval)
 }, [tickers])
 
+async function reloadArticles(sources: any[]) {
+  if (!sources?.length) return
+  setLoading(true)
+  try {
+    const sourceNames = sources.map(s => s.name)
+    const { data: allArticles } = await supabase
+      .from('articles').select('*')
+      .in('source', sourceNames)
+      .order('published_at', { ascending: false })
+      .limit(100)
+    if (allArticles) {
+      const balanced = sources.flatMap(src =>
+        allArticles.filter(a => a.source === src.name).slice(0, src.max_per_day || 5)
+      ).sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
+      setArticles(balanced)
+    }
+  } catch (e) {
+    console.error('Failed to reload:', e)
+  } finally {
+    setLoading(false)
+  }
+}
+
 async function removeSource(url: string) {
   if (!user) return
   await supabase.from('sources').delete().eq('url', url).eq('user_id', user.id)
@@ -188,6 +211,29 @@ async function fetchTickerPrices(userTickers: any[]) {
       })
     } catch (e) {}
   }
+
+async function reloadArticles(sources: any[]) {
+  if (!sources?.length) return
+  setLoading(true)
+  try {
+    const sourceNames = sources.map(s => s.name)
+    const { data: allArticles } = await supabase
+      .from('articles').select('*')
+      .in('source', sourceNames)
+      .order('published_at', { ascending: false })
+      .limit(100)
+    if (allArticles) {
+      const balanced = sources.flatMap(src =>
+        allArticles.filter(a => a.source === src.name).slice(0, src.max_per_day || 5)
+      ).sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
+      setArticles(balanced)
+    }
+  } catch (e) {
+    console.error('Failed to reload:', e)
+  } finally {
+    setLoading(false)
+  }
+}
 
   const fxList = userTickers.filter(t => t.type === 'fx')
   if (fxList.length > 0) {
@@ -420,7 +466,7 @@ async function fetchTickerPrices(userTickers: any[]) {
 
   <TickerManager tickers={tickers} user={user} onClose={() => setShowTickerManager(false)} onTickersChange={setTickers} />
 
-) : showSourceLibrary ? (<SourceLibrary userSources={userSources} user={user} onClose={() => setShowSourceLibrary(false)} onSourcesChange={setUserSources} />
+) : showSourceLibrary ? (<SourceLibrary userSources={userSources} user={user} onClose={() => setShowSourceLibrary(false)} onSourcesChange={(sources) => { setUserSources(sources); reloadArticles(sources) }} />
 
 ) : selectedArticle ? (<ArticleReader article={selectedArticle!} onClose={closeReader} onReadInFull={readInFull} onMarkReadAndReturn={markReadAndReturn} onNextArticle={nextArticle} />
 
@@ -428,9 +474,9 @@ async function fetchTickerPrices(userTickers: any[]) {
   <Onboarding
     user={user}
     onComplete={(sources) => {
-      setUserSources(sources)
-      setShowSourceLibrary(false)
-    }}
+  setUserSources(sources)
+  reloadArticles(sources)
+}}
     onOpenLibrary={() => setShowSourceLibrary(true)}
   />
 ) : !complete ? (
