@@ -6,6 +6,7 @@ import TickerManager from '@/app/components/TickerManager'
 import SourceLibrary from '@/app/components/SourceLibrary'
 import ArticleReader from '@/app/components/ArticleReader'
 import WatchedPages from '@/app/components/WatchedPages'
+import Onboarding from '@/app/components/Onboarding'
 
 type Article = {
   id: number
@@ -423,6 +424,15 @@ async function fetchTickerPrices(userTickers: any[]) {
 
 ) : selectedArticle ? (<ArticleReader article={selectedArticle!} onClose={closeReader} onReadInFull={readInFull} onMarkReadAndReturn={markReadAndReturn} onNextArticle={nextArticle} />
 
+  ) : userSources.length === 0 && !loading ? (
+  <Onboarding
+    user={user}
+    onComplete={(sources) => {
+      setUserSources(sources)
+      setShowSourceLibrary(false)
+    }}
+    onOpenLibrary={() => setShowSourceLibrary(true)}
+  />
 ) : !complete ? (
   <div style={{ overflowY:'auto', flex:1 }}>
     {loading ? (
