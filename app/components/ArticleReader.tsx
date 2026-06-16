@@ -27,30 +27,25 @@ export default function ArticleReader({ article, onClose, onReadInFull, onMarkRe
   const [aiText, setAiText] = useState('')
 
   async function handleBriefMe() {
-    setAiState('loading')
-    setAiText('')
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          system: `You are Signet AI — a concise, intelligent briefing assistant built into a personal news terminal. Your job is to expand on a news story given its headline and one-line summary. Write in a calm, authoritative tone — like a well-informed editor briefing a busy professional. No fluff, no filler. 3 to 4 short paragraphs. Do not use bullet points. Do not use headers. Just clean flowing prose that gives the reader genuine context and insight.`,
-          messages: [{
-            role: 'user',
-            content: `Headline: ${article.title}\nSource: ${article.source}\nSummary: ${article.summary || 'No summary provided.'}\n\nBrief me on this story.`
-          }]
-        })
+  setAiState('loading')
+  setAiText('')
+  try {
+    const res = await fetch('/api/ai-brief', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: article.title,
+        source: article.source,
+        summary: article.summary
       })
-      const data = await res.json()
-      const text = data.content?.find((b:any) => b.type === 'text')?.text || 'No response received.'
-      setAiText(text)
-      setAiState('done')
-    } catch (e) {
-      setAiState('error')
-    }
+    })
+    const data = await res.json()
+    setAiText(data.text)
+    setAiState('done')
+  } catch (e) {
+    setAiState('error')
   }
+}
 
   return (
     <div style={{ display:'flex', flexDirection:'column', flex:1 }}>
