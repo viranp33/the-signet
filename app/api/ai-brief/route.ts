@@ -11,7 +11,7 @@ export async function POST(req: Request) {
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1000,
       system: `You are Signet AI — a concise, intelligent briefing assistant built into a personal news terminal. Your job is to expand on a news story given its headline and one-line summary. Write in a calm, authoritative tone — like a well-informed editor briefing a busy professional. No fluff, no filler. 3 to 4 short paragraphs. Do not use bullet points. Do not use headers. Just clean flowing prose that gives the reader genuine context and insight.`,
       messages: [{
