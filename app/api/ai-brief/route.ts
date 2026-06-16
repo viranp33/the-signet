@@ -23,9 +23,6 @@ export async function POST(req: Request) {
 
   const data = await response.json()
 
-  // TEMPORARY DEBUG — shows us exactly what Anthropic sent back
-  console.log('ANTHROPIC RESPONSE:', JSON.stringify(data))
-
-  const text = data.content?.find((b: any) => b.type === 'text')?.text || `DEBUG - raw response: ${JSON.stringify(data)}`
+  const text = data.content?.find((b: any) => b.type === 'text')?.text || 'No response received.'
   return NextResponse.json({ text })
 }

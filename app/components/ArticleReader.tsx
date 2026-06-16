@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const C = { bg:'#F5F0E6',surface:'#EDE5D4',border:'#D4C9B0',borderLight:'#E8DFD0',text:'#1F1C18',textMid:'#4A4540',textMuted:'#9A8F82',accent:'#9A6B0C',positive:'#3B6D11' }
 
@@ -25,6 +25,17 @@ export default function ArticleReader({ article, onClose, onReadInFull, onMarkRe
 
   const [aiState, setAiState] = useState<'idle'|'loading'|'done'|'error'>('idle')
   const [aiText, setAiText] = useState('')
+  const [loadingPhrase, setLoadingPhrase] = useState(0)
+
+  const loadingPhrases = ['Reading the signals...', 'Gathering context...', 'Drafting the briefing...']
+
+  useEffect(() => {
+    if (aiState !== 'loading') return
+    const interval = setInterval(() => {
+      setLoadingPhrase(p => (p + 1) % loadingPhrases.length)
+    }, 2200)
+    return () => clearInterval(interval)
+  }, [aiState])
 
   async function handleBriefMe() {
   setAiState('loading')
@@ -33,6 +44,7 @@ export default function ArticleReader({ article, onClose, onReadInFull, onMarkRe
     const res = await fetch('/api/ai-brief', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+
       body: JSON.stringify({
         title: article.title,
         source: article.source,
@@ -84,8 +96,21 @@ export default function ArticleReader({ article, onClose, onReadInFull, onMarkRe
           )}
 
           {aiState === 'loading' && (
-            <div style={{ fontSize:12, color:C.textMuted, fontStyle:'italic', lineHeight:1.7 }}>
-              Reading the signals...
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <div style={{ display:'flex', gap:4 }}>
+                <span style={{ width:5, height:5, borderRadius:'50%', background:C.accent, animation:'signetPulse 1.2s infinite ease-in-out', animationDelay:'0s' }} />
+                <span style={{ width:5, height:5, borderRadius:'50%', background:C.accent, animation:'signetPulse 1.2s infinite ease-in-out', animationDelay:'0.2s' }} />
+                <span style={{ width:5, height:5, borderRadius:'50%', background:C.accent, animation:'signetPulse 1.2s infinite ease-in-out', animationDelay:'0.4s' }} />
+              </div>
+              <div style={{ fontSize:12, color:C.textMuted, fontStyle:'italic', lineHeight:1.7 }}>
+                {loadingPhrases[loadingPhrase]}
+              </div>
+              <style>{`
+                @keyframes signetPulse {
+                  0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
+                  40% { opacity: 1; transform: scale(1); }
+                }
+              `}</style>
             </div>
           )}
 
